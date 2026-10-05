@@ -49,7 +49,7 @@ async function generate(){
  const miss=[...new Set((data.recipes||[]).flatMap(x=>x.missing||[]))];
  shopping.innerHTML=miss.length?'<ul>'+miss.map(x=>'<li>☐ '+escapeHtml(x)+'</li>').join("")+'</ul>':'🎉 Voor deze recepten heb je alles al.';
  status.textContent="Klaar! De recepten zijn speciaal voor jouw voorraad bedacht.";
- }catch(e){recipes.innerHTML='<div class="empty">De AI is nog niet gekoppeld. De voorkant staat klaar voor de backend.</div>';status.textContent="⚠️ "+e.message}
+ }catch(e){recipes.innerHTML='<div class="empty">De AI kon het recept niet maken.<br><small>'+escapeHtml(e.message||"Onbekende fout")+'</small></div>';status.textContent="⚠️ "+(e.message||"Er ging iets mis")}
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 renderTags();
