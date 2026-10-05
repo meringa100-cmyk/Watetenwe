@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wat Eten We?</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(160deg,#fff7ed,#f0fdf4);color:#18211b}.app{max-width:760px;margin:auto;padding:16px}.hero,.card{background:#fff;border-radius:22px;padding:18px;margin-bottom:14px;box-shadow:0 6px 24px #0001}.hero{background:#183b2a;color:#fff}.hero h1{margin:0 0 4px}.row{display:flex;gap:8px}.grow{flex:1}input,select,button{font:inherit;padding:12px;border-radius:13px;border:1px solid #ccd8cf}input,select{width:100%;background:#fff}button{background:#e86f3d;color:#fff;border:0;font-weight:700;cursor:pointer}.tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.tag{background:#eaf5ed;padding:7px 10px;border-radius:99px}.tag b{cursor:pointer}.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.opts label{font-size:13px;font-weight:700}.opts select{margin-top:4px}.photo{margin-top:13px;padding:18px;border:2px dashed #bdcfc2;border-radius:16px;text-align:center}.photo input{display:none}.photo label{cursor:pointer;font-weight:700}.recipe{border:1px solid #dce6df;border-radius:16px;padding:14px;margin-top:10px}.meta{font-size:13px;color:#637068}.empty{text-align:center;color:#68756d}.small{font-size:12px;color:#718078}@media(max-width:500px){.row{flex-direction:column}.opts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<section class="hero"><h1>🍳 Wat Eten We?</h1><div>Zeg wat je hebt. Wij bedenken wat je eet.</div></section>
+<section class="card">
+<h2>🥕 Wat heb je in huis?</h2>
+<div class="row"><input id="ingredient" class="grow" placeholder="bijv. kip, paprika, rijst, ui"><button onclick="addIngredients()">Toevoegen</button></div>
+<div id="tags" class="tags"></div>
+<div class="photo"><label for="photo">📸 Foto van je koelkast / voorraad<br><span class="small">AI-fotoherkenning volgt in de volgende stap</span></label><input id="photo" type="file" accept="image/*" capture="environment"></div>
+</section>
+<section class="card">
+<h2>⚙️ Hoe wil je eten?</h2>
+<div class="opts">
+<label>Personen<select id="people"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+<label>Max. tijd<select id="time"><option>15</option><option selected>30</option><option>45</option><option>60</option></select></label>
+<label>Stijl<select id="style"><option>Makkelijk</option><option>Snel</option><option>Gezond</option><option>Budget</option><option>Uitgebreid</option></select></label>
+<label>Keuken<select id="cuisine"><option>Alles</option><option>Nederlands</option><option>Italiaans</option><option>Aziatisch</option><option>Mexicaans</option></select></label>
+</div>
+<button style="width:100%;margin-top:14px;font-size:17px" onclick="generate()">🤖 Wat zullen we eten?</button>
+<p id="status"></p>
+</section>
+<section class="card"><h2>🍽️ Jouw recepten</h2><div id="recipes" class="empty">Voeg ingrediënten toe en druk op de knop.</div></section>
+<section class="card"><h2>🛒 Boodschappenlijst</h2><div id="shopping" class="empty">Nog leeg.</div></section>
+</div>
+<script>
+let ingredients=JSON.parse(localStorage.getItem("wwe_ingredients")||"[]");
+function save(){localStorage.setItem("wwe_ingredients",JSON.stringify(ingredients));renderTags()}
+function renderTags(){tags.innerHTML=ingredients.map((x,i)=>'<span class="tag">'+x+' <b onclick="removeIngredient('+i+')">×</b></span>').join("")}
+function addIngredients(){let v=ingredient.value;v.split(/[,;]+/).map(x=>x.trim()).filter(Boolean).forEach(x=>{if(!ingredients.includes(x))ingredients.push(x)});ingredient.value="";save()}
+function removeIngredient(i){ingredients.splice(i,1);save()}
+async function generate(){
+ if(!ingredients.length){status.textContent="Voeg eerst ingrediënten toe.";return}
+ status.textContent="🤖 AI maakt recepten met jouw voorraad…";
+ recipes.innerHTML='<div class="empty">Even rekenen…</div>';
+ try{
+  const r=await fetch("/api/recipes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ingredients,people:people.value,time:time.value,style:style.value,cuisine:cuisine.value})});
+  const data=await r.json();
+  if(!r.ok)throw new Error(data.error||"Serverfout");
+  recipes.innerHTML=(data.recipes||[]).map(x=>'<article class="recipe"><h3>'+escapeHtml(x.title)+'</h3><div class="meta">'+escapeHtml(String(x.time||""))+' min · '+escapeHtml(String(people.value))+' personen</div><p>'+escapeHtml(x.description||"")+'</p><p><b>Ingrediënten</b></p><ul>'+(x.ingredients||[]).map(i=>'<li>'+escapeHtml(i)+'</li>').join("")+'</ul><p><b>Bereiding</b></p><ol>'+(x.steps||[]).map(s=>'<li>'+escapeHtml(s)+'</li>').join("")+'</ol><p><b>Ontbreekt:</b> '+escapeHtml((x.missing||[]).join(", ")||"niets")+'</p></article>').join("")||'<div class="empty">Geen recepten ontvangen.</div>';
+ const miss=[...new Set((data.recipes||[]).flatMap(x=>x.missing||[]))];
+ shopping.innerHTML=miss.length?'<ul>'+miss.map(x=>'<li>☐ '+escapeHtml(x)+'</li>').join("")+'</ul>':'🎉 Voor deze recepten heb je alles al.';
+ status.textContent="Klaar! De recepten zijn speciaal voor jouw voorraad bedacht.";
+ }catch(e){recipes.innerHTML='<div class="empty">De AI is nog niet gekoppeld. De voorkant staat klaar voor de backend.</div>';status.textContent="⚠️ "+e.message}
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+renderTags();
+</script>
+</body></html>
